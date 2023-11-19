@@ -21,7 +21,7 @@ struct process {
     int response_time;
 };
 
-// bool compare1(process p1, process p2) 
+// bool organizarPorOrdemDeChegada(process p1, process p2) 
 // { 
 //     return p1.arrival_time < p2.arrival_time;
 // }
@@ -31,13 +31,14 @@ bool organizarPorPids(process p1, process p2)
     return p1.pid < p2.pid;
 }
 
+// GERA PROCESSOS COM BURST TIME ALEATORIO
 void geraProcessos(queue<int> *q, int nProcessos, int burst_cpy[], struct process p[]){
     random_device rd;
     mt19937 gen(rd());
     uniform_int_distribution<> dis(0, 15);
     for(int i = 0; i < nProcessos; i++) {
         p[i].pid = i+1;
-        p[i].arrival_time = dis(gen);
+        p[i].arrival_time = i;
         p[i].burst_time = dis(gen);
         burst_cpy[i] = p[i].burst_time;
 
@@ -49,15 +50,16 @@ int main() {
     int nProcessos = NUM_PROCESSOS;
     int tempoQuantum = TEMPO_POR_PROCESSO;
     struct process p[nProcessos];
-    float avg_turnaround_time;
-    float avg_waiting_time;
-    float avg_response_time;
-    float cpu_utilisation;
-    int total_turnaround_time = 0;
-    int total_waiting_time = 0;
-    int total_response_time = 0;
-    int total_idle_time = 0;
+    float tempo_turnaround_medio;
+    float tempo_espera_medio;
+    float tempo_resposta_medio;
+    float utilizacao_cpu;
+    int tempo_turnaround_total = 0;
+    int tempo_espera_total = 0;
+    int tempo_resposta_total = 0;
+    int tempo_ausente_total = 0;
     float throughput;
+    // COPIA EM MEMORIA PARA TODOS OS TEMPOS DE BURSTS DOS PROCESSOS
     int burst_cpy[nProcessos];
     int idx;
 
@@ -70,21 +72,29 @@ int main() {
     int current_time = 0;
     int completed = 0;
 
+    // LAÇO EM LOOP
     while(completed != nProcessos) {
+        // CONSOME PRIMEIRO PROCESSO NA FILA
         idx = q.front();
         q.pop();
 
+
+        // ENTRANDO NO ESCALONADOR
         if (burst_cpy[idx] == p[idx].burst_time) {
             p[idx].start_time = max(current_time, p[idx].arrival_time);
-            total_idle_time += p[idx].start_time - current_time;
+            tempo_ausente_total += p[idx].start_time - current_time;
             current_time = p[idx].start_time;
         }
 
+        // TEMPO DE EXECUÇÃO DO PROCESSO
         if (burst_cpy[idx] - tempoQuantum > 0) {
             burst_cpy[idx] -= tempoQuantum;
             current_time += tempoQuantum;
+            // RETORNA AO FINAL DA FILA
             q.push(idx);
-        } else {
+        }
+        // CONCLUSÃO DO PROCESSO 
+        else {
             current_time += burst_cpy[idx];
             burst_cpy[idx] = 0;
             completed++;
@@ -94,47 +104,49 @@ int main() {
             p[idx].waiting_time = p[idx].turnaround_time - p[idx].burst_time;
             p[idx].response_time = p[idx].start_time - p[idx].arrival_time;
 
-            total_turnaround_time += p[idx].turnaround_time;
-            total_waiting_time += p[idx].waiting_time;
-            total_response_time += p[idx].response_time;
-        }
+            tempo_turnaround_total += p[idx].turnaround_time;
+            tempo_espera_total += p[idx].waiting_time;
+                tempo_resposta_total += p[idx].response_time;
+            }
 
     }
 
-    avg_turnaround_time = (float) total_turnaround_time / nProcessos;
-    avg_waiting_time = (float) total_waiting_time / nProcessos;
-    avg_response_time = (float) total_response_time / nProcessos;
-    cpu_utilisation = ((p[nProcessos-1].completion_time - total_idle_time) / (float) p[nProcessos-1].completion_time)*100;
+    tempo_turnaround_medio = (float) tempo_turnaround_total / nProcessos;
+    tempo_espera_medio = (float) tempo_espera_total / nProcessos;
+    tempo_resposta_medio = (float) tempo_resposta_total / nProcessos;
+    utilizacao_cpu = ((p[nProcessos-1].completion_time - tempo_ausente_total) / (float) p[nProcessos-1].completion_time)*100;
     throughput = float(nProcessos) / (p[nProcessos-1].completion_time - p[0].arrival_time);
 
     sort(p,p+nProcessos,organizarPorPids);
 
     cout<<endl;
-    cout<<"#P\t"<<"AT\t"<<"BT\t"<<"ST\t"<<"CT\t"<<"TAT\t"<<"WT\t"<<"RT\t"<<"\n"<<endl;
+    // MONTA TABELA COM VALORES DOS PROCESSOS
+    cout<<"PID\t"<<"AT(ms) "<<"BT(ms) "<<"ST(ms) "<<"CT(ms) "<<"TAT(ms) "<<"WT(ms) "<<"RT(ms) "<<"\n"<<endl;
 
     for(int i = 0; i < nProcessos; i++) {
         cout<<p[i].pid<<"\t"<<p[i].arrival_time<<"\t"<<p[i].burst_time<<"\t"<<p[i].start_time<<"\t"<<p[i].completion_time<<"\t"<<p[i].turnaround_time<<"\t"<<p[i].waiting_time<<"\t"<<p[i].response_time<<"\t"<<"\n"<<endl;
     }
-    cout<<"Average Turnaround Time = "<<avg_turnaround_time<<endl;
-    cout<<"Average Waiting Time = "<<avg_waiting_time<<endl;
-    cout<<"Average Response Time = "<<avg_response_time<<endl;
-    cout<<"CPU Utilization = "<<cpu_utilisation<<"%"<<endl;
-    cout<<"Throughput = "<<throughput<<" process/unit time"<<endl;
-
-
+    cout<<"Tempo de turnaroud medio = "<<tempo_turnaround_medio<<"ms"<<endl;
+    cout<<"Tempo de espera medio = "<<tempo_espera_medio<<"ms"<<endl;
+    cout<<"Tempo de resposta medio = "<<tempo_resposta_medio<<"ms"<<endl;
+    cout<<"Utilizacao CPU = "<<utilizacao_cpu<<"%"<<endl;
+    cout<<"Throughput = "<<throughput<<" processos/millisegundo"<<endl;
 }
+
 
 /*
 
-AT - Arrival Time of the process
-BT - Burst time of the process
-ST - Start time of the process
-CT - Completion time of the process
-TAT - Turnaround time of the process
-WT - Waiting time of the process
-RT - Response time of the process
+Considerações:
 
-Formulas used:
+AT - Tempo de chegada do processo
+BT - Tempo de burst do processo (tempo determinado ate fim de execucao do processo)
+ST - Tempo de inicio do processo
+CT - Tempo de conclusao do processo
+TAT - Tempo de turnaround do processo (tempo de conclusao efetiva desconsiderando)
+WT - Tempo de espera do processo
+RT - Tempo de resposta do processo (tempo registrado de quando o processo iniciou comparado ao tempo de chegada)
+
+Equações:
 
 TAT = CT - AT
 WT = TAT - BT
